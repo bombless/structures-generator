@@ -1,0 +1,18 @@
+[package]
+
+name = "structures-generator"
+version = "0.0.1"
+authors = ["bombless <bombless@126.com>"]
+license = "MIT"
+repository = "https://github.com/bombless/structures-generator"
+description = """
+A tool to automatically generate Rust code to operate C-style data from APIs of Windows.
+"""
+
+[[bin]]
+name = "structures-generator"
+path = "src/main.rs"
+
+
+[dependencies]
+hyper = "*"
