@@ -31,10 +31,10 @@ fn main() {
 				for block in code_blocks.iter() {
 					match web::decode(&**block) {
 						Ok(code) =>{
-							let code = pre::remove_single_line_comments(&*code);
-							match prs::compile(&mut code.clone()) {
+							let mut code = pre::remove_single_line_comments(&*code);
+							match prs::compile(&mut code) {
 								Ok(x) =>println!("{:?}", x),
-								Err(e) =>println!("error: {}, code<<<{}>>>", e, code)
+								Err(e) =>println!("error: {}", e)
 							}
 						},
 						Err(e) =>println!("error: {}", e)
