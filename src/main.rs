@@ -11,7 +11,10 @@ mod macros;
 mod cfg;
 #[allow(unstable)]
 mod web;
+#[allow(unstable)]
 mod parse;
+mod pre;
+mod tok;
 
 
 #[cfg(not(test))]
@@ -28,7 +31,7 @@ fn main() {
 				for block in code_blocks.iter() {
 					match web::decode(&**block) {
 						Ok(code) =>{
-							let code = parse::remove_single_line_comment(&*code);
+							let code = pre::remove_single_line_comments(&*code);
 							match parse::compile(&mut code.clone()) {
 								Ok(x) =>println!("{:?}", x),
 								Err(e) =>println!("error: {}, code<<<{}>>>", e, code)

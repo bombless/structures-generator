@@ -1,5 +1,10 @@
 use std::collections::HashMap;
 use std::rc::Rc;
+use tok::{
+	TokenStream,
+	Token,
+	ReadChar
+};
 
 #[derive(Debug, PartialEq, Clone)]
 struct Struct(HashMap<String, Type>);
@@ -22,161 +27,11 @@ fn make_pointer(v: Type)->Type {
 	Type::Pointer(Rc::new(v))
 }
 
-#[derive(Debug, PartialEq, Clone)]
-enum Token {
-	Ident(String),
-	Struct,
-	Union,
-	DWORD,
-	WORD,
-	BYTE,
-	SemiColon,
-	Comma,
-	LeftBrace,
-	RightBrace,
-	Typedef,
-	Pointer
-}
-
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 enum TypeName {
 	Normal(String),
 	Union(String),
 	Struct(String)
-}
-
-
-// I kinda want to use `Iterator<Item=char>` directly but a bug's there freaking me
-// so this is a wordaround
-trait ReadChar {
-	fn read(&mut self)->Option<char>;
-}
-
-impl ReadChar for String {
-	fn read(&mut self)->Option<char> {
-		if self.is_empty() {
-			None
-		} else {
-			Some(self.remove(0))
-		}
-	}
-}
-
-impl Token {
-	fn parse(reader: &mut ReadChar)->Result<Vec<Token>, String> {
-		let mut ret = Vec::new();
-		let mut elem = String::new();
-		
-		macro_rules! append_word{
-			() => (
-				if !elem.is_empty() {
-					let first = elem.as_bytes()[0];
-					if '0' as u8 <= first && '9' as u8 >= first {
-						return Err(format!("unexpected character {:?}", first as char))
-					}
-					ret.push(match &*elem {
-						"struct" =>Token::Struct,
-						"union" =>Token::Union,
-						"DWORD" =>Token::DWORD,
-						"WORD" =>Token::WORD,
-						"BYTE" =>Token::BYTE,
-						"typedef" =>Token::Typedef,
-						_ =>Token::Ident(elem.clone())
-					});
-					elem.clear()
-				}
-			)
-		}
-				
-		while let Some(c) = reader.read() {
-			match c {
-				' ' | '\t' | '\r' | '\n' =>{
-					append_word!();
-				},
-				'*' =>{
-					append_word!();
-					ret.push(Token::Pointer)
-				},
-				';' =>{
-					append_word!();
-					ret.push(Token::SemiColon)
-				},
-				',' =>{
-					append_word!();
-					ret.push(Token::Comma)
-				},
-				'{' =>{
-					append_word!();
-					ret.push(Token::LeftBrace)
-				},
-				'}' =>{
-					append_word!();
-					ret.push(Token::RightBrace)
-				},
-				'_' | '0' ... '9' | 'a' ... 'z' | 'A' ... 'Z' =>elem.push(c),
-				_ =>return Err(format!("unexpected character {:?}", c))
-			}
-		}
-		append_word!();
-		Ok(ret)		
-	}
-}
-
-#[derive(Clone, Debug)]
-struct TokenStream(Vec<Token>);
-
-impl TokenStream {
-	fn peek(&mut self)->Option<Token> {
-		if self.0.is_empty() {
-			None
-		} else {
-			Some(self.0[0].clone())
-		}
-	}
-	
-	fn read(&mut self)->Option<Token> {
-		if self.0.is_empty() {
-			None
-		} else {
-			Some(self.0.remove(0))
-		}
-	}
-	
-	fn new(v: Vec<Token>)->TokenStream {
-		TokenStream(v)
-	}
-	
-	fn eat(&mut self, tok: Token)->Result<(), String> {
-		match self.read() {
-			None =>Err(format!("unexpected EOF")),
-			Some(x) =>if tok != x {
-				Err(format!("unexpected token {:?}", x))
-			} else {
-				Ok(())
-			}
-		}
-	}
-}
-
-pub fn remove_single_line_comment(code: &str)->String {
-	let mut iter = code.chars();
-	let mut ret = String::new();
-	while let Some(c) = iter.next() {
-		match c {
-			'/' =>match iter.next() {
-				Some('/') =>while let Some(c) = iter.next() {
-					if c == '\n' {
-						ret.push(c);
-						break
-					}
-				},
-				Some(x) =>ret.push(x),
-				None =>()
-			},
-			_ =>ret.push(c)
-		}
-	}
-	ret
 }
 
 fn parse_struct(reader: &mut TokenStream)->Result<Struct, String> {
@@ -365,7 +220,6 @@ fn parse_typedef(reader: &mut TokenStream)->Result<HashMap<TypeName, Type>, Stri
 	}
 }
 
-#[allow(unstable)]
 pub fn compile(reader: &mut ReadChar)->Result<HashMap<TypeName, Type>, String> {
 	let tokens = try!(Token::parse(reader));
 	let stream = &mut TokenStream::new(tokens);
@@ -461,26 +315,7 @@ pub fn compile(reader: &mut ReadChar)->Result<HashMap<TypeName, Type>, String> {
 }
 
 #[cfg(test)]
-mod tests {
-	#[test]
-	fn test_comment() {
-		use parse::remove_single_line_comment;
-		assert_eq!(&*remove_single_line_comment("//"), "")
-	}
-
-	#[test]
-	fn test_simple_case_for_tokenizer() {
-		use parse::Token;
-		let mut test = format!("typedef DWORD u32;");
-		let rslt = Token::parse(&mut test).unwrap();
-		assert_eq!(rslt,
-			vec![
-				Token::Typedef,
-				Token::DWORD,
-				Token::Ident(format!("u32")),
-				Token::SemiColon])
-	}
-	
+mod tests {	
 	#[test]
 	#[allow(unstable)]
 	fn test_simple_case_for_parser() {
