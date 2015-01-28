@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::collections::hash_map::Iter;
-use std::cmp::max;
 use std::rc::Rc;
 use std::fmt::Result as FmtResult;
 use std::fmt::{
@@ -21,6 +20,30 @@ const POINTER_SIZE: usize = 4;
 struct Struct(HashMap<String, (usize, usize)>);
 
 impl Struct {
+	fn iter(&self)->Iter<String, (usize, usize)> {
+		self.0.iter()
+	}
+	
+	fn inject_struct(&mut self, s: Struct)->Result<(), String> {
+		let bound = self.size();
+		for (k, &(offset, size)) in s.iter() {
+			if self.layout_mut().insert(k.clone(), (offset + bound, size)).is_some() {
+				return Err(format!("dup of field name {}", k))
+			}
+		}
+		Ok(())
+	}
+	
+	fn inject_union(&mut self, u: Union)->Result<(), String> {
+		let bound = self.size();
+		for (k, &(offset, size)) in u.iter() {
+			if self.layout_mut().insert(k.clone(), (offset + bound, size)).is_some() {
+				return Err(format!("dup of field name {}", k))
+			}
+		}
+		Ok(())
+	}
+	
 	fn insert(&mut self, name: String, size: usize)->Option<(usize, usize)> {
 		let bound = self.size();
 		self.layout_mut().insert(name, (bound, size))
@@ -75,18 +98,40 @@ impl Debug for Struct {
 }
 
 #[derive(PartialEq, Clone)]
-struct Union(HashMap<String, usize>);
+struct Union(HashMap<String, (usize, usize)>);
 
 impl Union {
-	fn insert(&mut self, name: String, size: usize)->Option<usize> {
-		self.layout_mut().insert(name, size)
+	fn iter(&self)->Iter<String, (usize, usize)> {
+		self.0.iter()
 	}
 	
-	fn layout_mut(&mut self)->&mut HashMap<String, usize> {
+	fn inject_struct(&mut self, s: Struct)->Result<(), String> {
+		for (k, &v) in s.iter() {
+			if self.layout_mut().insert(k.clone(), v).is_some() {
+				return Err(format!("dup of field name {}", k))
+			}
+		}
+		Ok(())
+	}
+	
+	fn inject_union(&mut self, u: Union)->Result<(), String> {
+		for (k, &v) in u.iter() {
+			if self.layout_mut().insert(k.clone(), v).is_some() {
+				return Err(format!("dup of field name {}", k))
+			}
+		}
+		Ok(())
+	}
+
+	fn insert(&mut self, name: String, size: usize)->Option<(usize, usize)> {
+		self.layout_mut().insert(name, (0, size))
+	}
+	
+	fn layout_mut(&mut self)->&mut HashMap<String, (usize, usize)> {
 		&mut self.0
 	}
 	
-	fn layout(&self)->&HashMap<String, usize> {
+	fn layout(&self)->&HashMap<String, (usize, usize)> {
 		&self.0
 	}
 	
@@ -99,17 +144,21 @@ impl Union {
 	}
 	
 	fn size(&self)->usize {
-		self.layout().iter().fold(0, |acc, (_, &size)| max(acc, size))
+		let mut ret = 0;
+		for (_, &(offset, size)) in self.layout().iter() {
+			if ret < offset + size { ret = offset + size }
+		}
+		ret
 	}
 }
 
 impl Display for Union {
 	fn fmt(&self, f: &mut Formatter)->FmtResult {
-		let mut slice = self.layout().iter().fold(Vec::new(), |mut acc, (field_name, &size)| {
-			acc.push((size, format!("\t{:32} {};\n", if size == 0 {
-				format!("(size unknown)")
+		let mut slice = self.layout().iter().fold(Vec::new(), |mut acc, (field_name, &(offset, size))| {
+			acc.push(((offset, size), format!("\t{:32} {};\n", if size == 0 {
+				format!("{:02X} (offset only, size unknown)", offset)
 			} else {
-				format!("[size: {:02X}]", size)
+				format!("{:02X} - {:02X}", offset, offset + size)
 			}, field_name)));
 			acc
 		});
@@ -245,14 +294,30 @@ fn parse_struct(reader: &mut TokenStream)->Result<Struct, String> {
 				if let Some(Token::Ident(_)) = peek {
 					reader.read().unwrap();
 				}
-				try!(parse_struct(reader)).size()
+				let s = try!(parse_struct(reader));
+				let peek = reader.peek();
+				if peek == Some(Token::SemiColon) {
+					reader.read().unwrap();
+					try!(ret.inject_struct(s));
+					continue
+				} else {
+					s.size()
+				}
 			},
 			Token::Union =>{
 				let peek = reader.peek();
 				if let Some(Token::Ident(_)) = peek {
 					reader.read().unwrap();
 				}
-				try!(parse_union(reader)).size()
+				let u = try!(parse_union(reader));
+				let peek = reader.peek();
+				if peek == Some(Token::SemiColon) {
+					reader.read().unwrap();
+					try!(ret.inject_union(u));
+					continue
+				} else {
+					u.size()
+				}
 			},
 			Token::Ident(_) =>0,
 			Token::DWORD =>4,
@@ -304,14 +369,30 @@ fn parse_union(reader: &mut TokenStream)->Result<Union, String> {
 				if let Some(Token::Ident(_)) = peek {
 					reader.read().unwrap();
 				}
-				try!(parse_struct(reader)).size()
+				let s = try!(parse_struct(reader));
+				let peek = reader.peek();
+				if peek == Some(Token::SemiColon) {
+					reader.read().unwrap();
+					try!(ret.inject_struct(s));
+					continue
+				} else {
+					s.size()
+				}
 			},
 			Token::Union =>{
 				let peek = reader.peek();
 				if let Some(Token::Ident(_)) = peek {
 					reader.read().unwrap();
 				};
-				try!(parse_union(reader)).size()
+				let u = try!(parse_union(reader));
+				let peek = reader.peek();
+				if peek == Some(Token::SemiColon) {
+					reader.read().unwrap();
+					try!(ret.inject_union(u));
+					continue
+				} else {
+					u.size()
+				}
 			},
 			Token::Ident(_) =>0,
 			Token::DWORD =>4,
@@ -521,6 +602,7 @@ mod tests {
 			Type,
 			compile,
 			Struct,
+			Union,
 			GlobalNameSpace
 		};
 		let mut tests = vec![
@@ -556,11 +638,37 @@ mod tests {
 					ns.insert(TypeName::Normal(format!("s")), Type::Struct(structure));
 					ns
 				}
+			),
+			(
+				"typedef struct { union { DWORD val; WORD word; }; } s;",
+				{
+					let mut u = Union::new();
+					u.insert(format!("val"), 4);
+					u.insert(format!("word"), 2);
+					let mut s = Struct::new();
+					assert_eq!(s.inject_union(u), Ok(()));
+					let mut ns = GlobalNameSpace::new();
+					ns.insert(TypeName::Normal(format!("s")), Type::Struct(s));
+					ns
+				}
 			)
 		];
 		for (s, m) in tests.drain() {
 			assert_eq!(compile(&mut format!("{}", s)).unwrap(), m)
 		}
+	}
+	
+	#[test]
+	fn test_parser_output() {
+		use prs::compile;
+		vec![
+			(
+				format!("typedef struct {{\n\t{:32} word;\n\t{:32} val;\n}} s;\n",
+							"00 - 02", "00 - 04"),
+				compile(&mut format!("{}",
+						"typedef struct { union { DWORD val; WORD word; }; } s;")).unwrap()
+			)
+		].drain().fold((), |_, (lhs, rhs)| assert_eq!(lhs, format!("{:?}", rhs)))
 	}
 }
 
