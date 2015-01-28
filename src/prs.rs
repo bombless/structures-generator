@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::cmp::max;
 use std::rc::Rc;
 use tok::{
 	TokenStream,
@@ -6,25 +7,117 @@ use tok::{
 	ReadChar
 };
 
-#[derive(Debug, PartialEq, Clone)]
-struct Struct(HashMap<String, Type>);
+const POINTER_SIZE: usize = 4;
 
 #[derive(Debug, PartialEq, Clone)]
-struct Union(HashMap<String, Type>);
-
-#[derive(Debug, PartialEq, Clone)]
-enum Type {
-	Struct(Struct),
-	Union(Union),
-	DWORD,
-	WORD,
-	BYTE,
-	Pointer(Rc<Type>),
-	Unknown(TypeName)
+enum Struct {
+	Named {
+		name: String,
+		layout: HashMap<String, (usize, usize)>
+	},
+	Unnamed {
+		layout: HashMap<String, (usize, usize)>
+	}
 }
 
-fn make_pointer(v: Type)->Type {
-	Type::Pointer(Rc::new(v))
+impl Struct {
+	fn insert(&mut self, name: String, size: usize)->Option<(usize, usize)> {
+		let bound = self.size();
+		self.layout_mut().insert(name, (bound, size))
+	}
+	
+	fn new(name: Option<String>)->Struct {
+		match name {
+			Some(name) =>Struct::Named {
+				layout: HashMap::new(),
+				name: name
+			},
+			None =>Struct::Unnamed {
+				layout: HashMap::new()
+			}
+		}
+	}
+	
+	fn layout_mut(&mut self)->&mut HashMap<String, (usize, usize)> {
+		match self {
+			&mut Struct::Named { ref mut layout, .. } | &mut Struct::Unnamed { ref mut layout } =>{
+				layout
+			}
+		}
+	}
+	
+	fn layout(&self)->&HashMap<String, (usize, usize)> {
+		match self {
+			&Struct::Named { ref layout, .. } | &Struct::Unnamed { ref layout } =>{
+				layout
+			}
+		}
+	}
+	
+	fn is_empty(&self)->bool {
+		self.layout().is_empty()
+	}
+	
+	fn size(&self)->usize {
+		let mut ret = 0;
+		for (_, &(offset, size)) in self.layout().iter() {
+			if ret < offset + size { ret = offset + size }
+		}
+		ret
+	}
+}
+
+#[derive(Debug, PartialEq, Clone)]
+enum Union {
+	Named {
+		name: String,
+		layout: HashMap<String, usize>
+	},
+	Unnamed {
+		layout: HashMap<String, usize>
+	}
+}
+
+impl Union {
+	fn insert(&mut self, name: String, size: usize)->Option<usize> {
+		self.layout_mut().insert(name, size)
+	}
+	
+	fn layout_mut(&mut self)->&mut HashMap<String, usize> {
+		match self {
+			&mut Union::Named { ref mut layout, .. } | &mut Union::Unnamed { ref mut layout } =>{
+				layout
+			}
+		}
+	}
+	
+	fn layout(&self)->&HashMap<String, usize> {
+		match self {
+			&Union::Named { ref layout, .. } | &Union::Unnamed { ref layout } =>{
+				layout
+			}
+		}
+	}
+	
+	fn is_empty(&self)->bool {
+		self.layout().is_empty()
+	}
+	
+	fn new(name: Option<String>)->Union {
+		match name {
+			Some(name) =>Union::Named {
+				layout: HashMap::new(),
+				name: name
+			},
+			None =>Union::Unnamed {
+				layout: HashMap::new()
+			}
+		}
+	}
+	
+	fn size(&self)->usize {
+		self.layout().iter().fold(0, |acc, (_, &size)| max(acc, size))
+	}
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -34,51 +127,70 @@ enum TypeName {
 	Struct(String)
 }
 
-fn parse_struct(reader: &mut TokenStream)->Result<Struct, String> {
+#[derive(Clone, PartialEq, Debug)]
+enum Type {
+	Struct(Struct),
+	Union(Union),
+	Primitive(usize),
+	Pointer(Rc<Type>),
+	Unknown(TypeName)
+}
+
+fn make_pointer(v: Type)->Type {
+	Type::Pointer(Rc::new(v))
+}
+
+fn parse_struct(reader: &mut TokenStream, name: Option<String>)->Result<Struct, String> {
 	try!(reader.eat(Token::LeftBrace));
-	let mut ret = HashMap::new();
+	let mut ret = Struct::new(name);
 	loop {
 		let token = match reader.read() {
 			None =>return Err(format!("unexpected EOF")),
 			Some(x) =>x
 		};
-		let val = match token {
+		let size = match token {
 			Token::RightBrace =>break,
 			Token::Struct =>{
 				let peek = reader.peek();
-				if let Some(Token::Ident(_)) = peek {
+				let name = if let Some(Token::Ident(name)) = peek {
 					reader.read().unwrap();
-				}
-				Type::Struct(try!(parse_struct(reader)))
+					Some(name)
+				} else {
+					None
+				};
+				try!(parse_struct(reader, name)).size()
 			},
 			Token::Union =>{
 				let peek = reader.peek();
-				if let Some(Token::Ident(_)) = peek {
+				let name = if let Some(Token::Ident(name)) = peek {
 					reader.read().unwrap();
-				}
-				Type::Union(try!(parse_union(reader)))
+					Some(name)
+				} else {
+					None
+				};
+				try!(parse_union(reader, name)).size()
 			},
-			Token::Ident(name) =>Type::Unknown(TypeName::Normal(name)),
-			Token::DWORD =>Type::DWORD,
-			Token::WORD =>Type::WORD,
-			Token::BYTE =>Type::BYTE,
+			Token::Ident(_) =>0,
+			Token::DWORD =>4,
+			Token::WORD =>2,
+			Token::BYTE =>1,
 			Token::SemiColon | Token::Comma | Token::LeftBrace | Token::Typedef | Token::Pointer =>{
 				return Err(format!("unexpected token {:?}", token))
 			}
 		};
-		let mut val = val;
+		let mut size = size;
 		loop {
 			let peek = reader.peek();
 			if Some(Token::Pointer) == peek {
 				reader.read().unwrap();
-				val = make_pointer(val);
+				size = POINTER_SIZE;
 			} else {
 				break
 			}
 		}
-		let val = val;
+		let size = size;
 		match reader.read() {
-			Some(Token::Ident(name)) =>if ret.insert(name.clone(), val).is_some() {
+			Some(Token::Ident(name)) =>if ret.insert(name.clone(), size).is_some() {
 				return Err(format!("dup of field name {}", name))
 			},
 			Some(tok) =>return Err(format!("unexpected token {:?}", tok)),
@@ -89,13 +201,13 @@ fn parse_struct(reader: &mut TokenStream)->Result<Struct, String> {
 	if ret.is_empty() {
 		Err(format!("a struct needs at least one field"))
 	} else {
-		Ok(Struct(ret))
+		Ok(ret)
 	}
 }
 
-fn parse_union(reader: &mut TokenStream)->Result<Union, String> {
+fn parse_union(reader: &mut TokenStream, name: Option<String>)->Result<Union, String> {
 	try!(reader.eat(Token::LeftBrace));
-	let mut ret = HashMap::new();
+	let mut ret = Union::new(name);
 	loop {
 		let token = match reader.read() {
 			None =>return Err(format!("unexpected EOF")),
@@ -105,22 +217,28 @@ fn parse_union(reader: &mut TokenStream)->Result<Union, String> {
 			Token::RightBrace =>break,
 			Token::Struct =>{
 				let peek = reader.peek();
-				if let Some(Token::Ident(_)) = peek {
+				let name = if let Some(Token::Ident(name)) = peek {
 					reader.read().unwrap();
-				}
-				Type::Struct(try!(parse_struct(reader)))
+					Some(name)
+				} else {
+					None
+				};
+				try!(parse_struct(reader, name)).size()
 			},
 			Token::Union =>{
 				let peek = reader.peek();
-				if let Some(Token::Ident(_)) = peek {
+				let name = if let Some(Token::Ident(name)) = peek {
 					reader.read().unwrap();
-				}
-				Type::Union(try!(parse_union(reader)))
+					Some(name)
+				} else {
+					None
+				};
+				try!(parse_union(reader, name)).size()
 			},
-			Token::Ident(name) =>Type::Unknown(TypeName::Normal(name)),
-			Token::DWORD =>Type::DWORD,
-			Token::WORD =>Type::WORD,
-			Token::BYTE =>Type::BYTE,
+			Token::Ident(_) =>0,
+			Token::DWORD =>4,
+			Token::WORD =>2,
+			Token::BYTE =>1,
 			Token::SemiColon | Token::Comma | Token::LeftBrace | Token::Typedef | Token::Pointer =>{
 				return Err(format!("unexpected token {:?}", token))
 			}
@@ -130,7 +248,7 @@ fn parse_union(reader: &mut TokenStream)->Result<Union, String> {
 			let peek = reader.peek();
 			if Some(Token::Pointer) == peek {
 				reader.read().unwrap();
-				val = make_pointer(val);
+				val = POINTER_SIZE;
 			} else {
 				break
 			}
@@ -148,7 +266,7 @@ fn parse_union(reader: &mut TokenStream)->Result<Union, String> {
 	if ret.is_empty() {
 		Err(format!("a union needs at least one field"))
 	} else {
-		Ok(Union(ret))
+		Ok(ret)
 	}
 }
 
@@ -162,23 +280,29 @@ fn parse_typedef(reader: &mut TokenStream)->Result<HashMap<TypeName, Type>, Stri
 	let val = match token {
 		Token::Struct =>{
 			let peek = reader.peek();
-			if let Some(Token::Ident(name)) = peek {
+			let name = if let Some(Token::Ident(name)) = peek {
 				reader.read().unwrap();
-				optional_name = Some(TypeName::Struct(name))
-			}
-			Type::Struct(try!(parse_struct(reader)))
+				optional_name = Some(TypeName::Struct(name.clone()));
+				Some(name)
+			} else {
+				None
+			};
+			Type::Struct(try!(parse_struct(reader, name)))
 		},
 		Token::Union =>{
 			let peek = reader.peek();
-			if let Some(Token::Ident(name)) = peek {
+			let name = if let Some(Token::Ident(name)) = peek {
 				reader.read().unwrap();
-				optional_name = Some(TypeName::Union(name))
-			}
-			Type::Union(try!(parse_union(reader)))
+				optional_name = Some(TypeName::Union(name.clone()));
+				Some(name)
+			} else {
+				None
+			};
+			Type::Union(try!(parse_union(reader, name)))
 		},
-		Token::DWORD =>Type::DWORD,
-		Token::WORD =>Type::WORD,
-		Token::BYTE =>Type::BYTE,
+		Token::DWORD =>Type::Primitive(4),
+		Token::WORD =>Type::Primitive(2),
+		Token::BYTE =>Type::Primitive(1),
 		Token::SemiColon | Token::Comma | Token::LeftBrace | Token::RightBrace |
 			Token::Typedef | Token::Pointer =>{
 			return Err(format!("unexpected token {:?}", token))
@@ -253,8 +377,8 @@ pub fn compile(reader: &mut ReadChar)->Result<HashMap<TypeName, Type>, String> {
 							None =>()
 						}
 					} else {
-						let struct_name = TypeName::Struct(name);
-						let val = Type::Struct(try!(parse_struct(stream)));
+						let struct_name = TypeName::Struct(name.clone());
+						let val = Type::Struct(try!(parse_struct(stream, Some(name))));
 						match ret.insert(struct_name.clone(), val.clone()) {
 							None | Some(Type::Unknown(TypeName::Struct(_))) =>(),
 							x @ Some(Type::Struct(_)) =>if x != Some(val.clone()) {
@@ -266,7 +390,7 @@ pub fn compile(reader: &mut ReadChar)->Result<HashMap<TypeName, Type>, String> {
 						}
 					}
 				} else {
-					try!(parse_struct(stream));
+					try!(parse_struct(stream, None));
 				}
 			},
 			Token::Union =>{
@@ -287,8 +411,8 @@ pub fn compile(reader: &mut ReadChar)->Result<HashMap<TypeName, Type>, String> {
 							None =>()
 						}
 					} else {
-						let union_name = TypeName::Union(name);
-						let val = Type::Union(try!(parse_union(stream)));
+						let union_name = TypeName::Union(name.clone());
+						let val = Type::Union(try!(parse_union(stream, Some(name))));
 						match ret.insert(union_name.clone(), val.clone()) {
 							None | Some(Type::Unknown(TypeName::Union(_))) =>(),
 							x @ Some(Type::Union(_)) =>if x != Some(val.clone()) {
@@ -300,7 +424,7 @@ pub fn compile(reader: &mut ReadChar)->Result<HashMap<TypeName, Type>, String> {
 						}
 					}
 				} else {
-					try!(parse_union(stream));
+					try!(parse_union(stream, None));
 				}
 			},
 			Token::SemiColon | Token::Comma | Token::LeftBrace | Token::RightBrace |
@@ -331,7 +455,7 @@ mod tests {
 				"typedef DWORD u32;",
 				{
 					let mut map = HashMap::new();
-					map.insert(TypeName::Normal(format!("u32")), Type::DWORD);
+					map.insert(TypeName::Normal(format!("u32")), Type::Primitive(4));
 					map
 				}
 			),
@@ -342,11 +466,22 @@ mod tests {
 				"struct s { BYTE b; };",
 				{
 					let mut tree = HashMap::new();
-					let mut s = HashMap::new();
-					s.insert(format!("b"), Type::BYTE);
-					let s = Type::Struct(Struct(s));
+					let mut s = Struct::new(Some(format!("s")));
+					s.insert(format!("b"), 1);
+					let s = Type::Struct(s);
 					tree.insert(TypeName::Struct(format!("s")), s);
 					tree
+				}
+			),
+			(
+				"typedef struct _s { DWORD val; } s;",
+				{
+					let mut structure = Struct::new(Some(format!("_s")));
+					structure.insert(format!("val"), 4);
+					let mut map = HashMap::new();
+					map.insert(TypeName::Struct(format!("_s")), Type::Struct(structure.clone()));
+					map.insert(TypeName::Normal(format!("s")), Type::Struct(structure));
+					map
 				}
 			)
 		];
