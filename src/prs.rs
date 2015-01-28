@@ -320,7 +320,7 @@ mod tests {
 	#[allow(unstable)]
 	fn test_simple_case_for_parser() {
 		use std::collections::HashMap;
-		use parse::{
+		use prs::{
 			TypeName,
 			Type,
 			compile,

@@ -12,7 +12,7 @@ mod cfg;
 #[allow(unstable)]
 mod web;
 #[allow(unstable)]
-mod parse;
+mod prs;
 mod pre;
 mod tok;
 
@@ -32,7 +32,7 @@ fn main() {
 					match web::decode(&**block) {
 						Ok(code) =>{
 							let code = pre::remove_single_line_comments(&*code);
-							match parse::compile(&mut code.clone()) {
+							match prs::compile(&mut code.clone()) {
 								Ok(x) =>println!("{:?}", x),
 								Err(e) =>println!("error: {}, code<<<{}>>>", e, code)
 							}
