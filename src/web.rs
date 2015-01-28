@@ -1,9 +1,11 @@
 use std::path::Path;
-use std::io::USER_DIR;
+use std::io::{
+	USER_DIR,
+	IoErrorKind
+};
 use std::io::fs::{
 	File,
-	mkdir,
-	PathExtensions
+	mkdir
 };
 #[cfg(not(test))]
 use hyper::Url;
@@ -25,6 +27,12 @@ impl Page {
 }
 
 fn cache_path(name: &str)->Path {
+	let dir = Path::new(".cache");
+	if let Err(err) = mkdir(&dir, USER_DIR) {
+		if err.kind != IoErrorKind::PathAlreadyExists {
+			panic!(err)
+		}
+	}
 	Path::new(name.chars().fold(format!(".cache/"), |mut acc, c| {
 		acc.push_str(&*format!("{}", c as u64));
 		acc
@@ -42,10 +50,6 @@ fn load_url(name: &str)->Result<String, String> {
 	let url = try_or_str!(Url::parse(name));
 	let mut res = try_or_str!(Client::new().get(url).send());
 	let body = try_or_str!(res.read_to_string());
-	let dir = Path::new(".cache");
-	if !dir.exists() {
-		mkdir(&dir, USER_DIR).unwrap()
-	}
 	let file_path = cache_path(name);
 	File::create(&file_path).write_str(&*body).unwrap();
 	Ok(body)
