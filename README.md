@@ -7,8 +7,8 @@ It can also used to analysis structures of a set of C APIs.
 The project is still under heavy development.
 
 # TODO
-- support unnamed union inside struct
-- support unnamed struct inside union
+- ~~support unnamed union fields inside struct~~
+- ~~support unnamed struct fields inside union~~
 - support macro
 - support array
 
