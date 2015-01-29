@@ -2,7 +2,7 @@
 mod tests;
 
 // I kinda want to use `Iterator<Item=char>` directly but a bug's there freaking me
-// so this is a wordaround
+// so this is a workaround
 pub trait ReadChar {
 	fn read(&mut self)->Option<char>;
 }
