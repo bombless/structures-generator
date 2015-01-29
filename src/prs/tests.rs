@@ -62,7 +62,7 @@ fn test_simple_case_for_parser() {
 	}
 }
 
-	#[test]
+#[test]
 fn test_parser_output() {
 	use prs::compile;
 	vec![
