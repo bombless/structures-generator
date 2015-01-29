@@ -1,6 +1,6 @@
 structures-generator is a tool to automatically generate Rust code to operate C-style data from APIs of Windows.
 
-It collects URLs from json config file, then parse code from the disinated web page.
+It collects URLs from json config file, then parse code from the designated web page.
 Eventually it can generate Rust code that interop wich C APIs.
 It can also used to analysis structures of a set of C APIs.
 
