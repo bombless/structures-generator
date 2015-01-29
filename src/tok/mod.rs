@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod tests;
+
 // I kinda want to use `Iterator<Item=char>` directly but a bug's there freaking me
 // so this is a wordaround
 pub trait ReadChar {
@@ -123,21 +126,5 @@ impl TokenStream {
 				Ok(())
 			}
 		}
-	}
-}
-
-#[cfg(test)]
-mod tests {
-	#[test]
-	fn test_simple_case_for_tokenizer() {
-		use tok::Token;
-		let mut test = format!("typedef DWORD u32;");
-		let rslt = Token::parse(&mut test).unwrap();
-		assert_eq!(rslt,
-			vec![
-				Token::Typedef,
-				Token::DWORD,
-				Token::Ident(format!("u32")),
-				Token::SemiColon])
 	}
 }

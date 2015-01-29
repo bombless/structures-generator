@@ -2,6 +2,9 @@ use std::path::Path;
 use std::io::fs::File;
 use serialize::json::decode;
 
+#[cfg(test)]
+mod tests;
+
 pub fn load_config()->Result<Vec<String>, String> {
 	let path = Path::new("urls.json");
 	let mut file = try_or_str!(File::open(&path));

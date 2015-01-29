@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod tests;
+
 pub fn remove_single_line_comments(code: &str)->String {
 	let mut iter = code.chars();
 	let mut ret = String::new();
@@ -17,14 +20,4 @@ pub fn remove_single_line_comments(code: &str)->String {
 		}
 	}
 	ret
-}
-
-
-#[cfg(test)]
-mod tests {
-	#[test]
-	fn test_comment() {
-		use pre::remove_single_line_comments as remove_comments;
-		assert_eq!(&*remove_comments("//"), "")
-	}
 }
