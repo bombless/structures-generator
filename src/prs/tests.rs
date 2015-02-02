@@ -1,5 +1,4 @@
 #[test]
-#[allow(unstable)]
 fn test_simple_case_for_parser() {
 	use prs::{
 		TypeName,

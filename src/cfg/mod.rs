@@ -1,5 +1,5 @@
 use std::path::Path;
-use std::io::fs::File;
+use std::old_io::fs::File;
 use serialize::json::decode;
 
 #[cfg(test)]

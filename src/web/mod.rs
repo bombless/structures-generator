@@ -1,9 +1,9 @@
 use std::path::Path;
-use std::io::{
+use std::old_io::{
 	USER_DIR,
 	IoErrorKind
 };
-use std::io::fs::{
+use std::old_io::fs::{
 	File,
 	mkdir
 };

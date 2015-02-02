@@ -22,7 +22,7 @@ fn test_cache() {
 		load_from_cache,
 		cache_path
 	};
-	use std::io::fs::File;
+	use std::old_io::fs::File;
 	let path = cache_path("test");
 	File::create(&path).write_str("test").unwrap();
 	let rslt = load_from_cache("test").unwrap();

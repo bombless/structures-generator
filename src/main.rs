@@ -1,17 +1,13 @@
+#![feature(core, hash, collections, io, rustc_private, path)]
 extern crate hyper;
-#[allow(unstable)]
 extern crate serialize;
-#[allow(unstable)]
 extern crate regex;
 
 #[macro_use]
 mod macros;
-#[allow(unstable)]
 #[cfg(not(test))]
 mod cfg;
-#[allow(unstable)]
 mod web;
-#[allow(unstable)]
 mod prs;
 mod pre;
 mod tok;
