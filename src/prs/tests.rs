@@ -57,7 +57,7 @@ fn test_simple_case_for_parser() {
 		)
 	];
 	for (s, m) in tests.drain() {
-		assert_eq!(compile(&mut format!("{}", s)).unwrap(), m)
+		assert_eq!(compile(&mut s.chars()).unwrap(), m)
 	}
 }
 
@@ -68,8 +68,7 @@ fn test_parser_output() {
 		(
 			format!("typedef struct {{\n\t{:32} word;\n\t{:32} val;\n}} s;\n",
 						"00 - 02", "00 - 04"),
-			compile(&mut format!("{}",
-					"typedef struct { union { DWORD val; WORD word; }; } s;")).unwrap()
+			compile(&mut "typedef struct { union { DWORD val; WORD word; }; } s;".chars()).unwrap()
 		)
 	].drain().fold((), |_, (lhs, rhs)| assert_eq!(lhs, format!("{:?}", rhs)))
 }

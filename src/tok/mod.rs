@@ -1,22 +1,6 @@
 #[cfg(test)]
 mod tests;
 
-// I kinda want to use `Iterator<Item=char>` directly but a bug's there freaking me
-// so this is a workaround
-pub trait ReadChar {
-	fn read(&mut self)->Option<char>;
-}
-
-impl ReadChar for String {
-	fn read(&mut self)->Option<char> {
-		if self.is_empty() {
-			None
-		} else {
-			Some(self.remove(0))
-		}
-	}
-}
-
 #[derive(Debug, PartialEq, Clone)]
 pub enum Token {
 	Ident(String),
@@ -34,7 +18,7 @@ pub enum Token {
 }
 
 impl Token {
-	pub fn parse(reader: &mut ReadChar)->Result<Vec<Token>, String> {
+	pub fn parse(reader: &mut Iterator<Item=char>)->Result<Vec<Token>, String> {
 		let mut ret = Vec::new();
 		let mut elem = String::new();
 		
@@ -59,7 +43,7 @@ impl Token {
 			)
 		}
 				
-		while let Some(c) = reader.read() {
+		while let Some(c) = reader.next() {
 			match c {
 				' ' | '\t' | '\r' | '\n' =>{
 					append_word!();

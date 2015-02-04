@@ -9,8 +9,7 @@ use std::fmt::{
 };
 use tok::{
 	TokenStream,
-	Token,
-	ReadChar
+	Token
 };
 
 #[cfg(test)]
@@ -499,7 +498,7 @@ fn parse_typedef(reader: &mut TokenStream)->Result<GlobalNameSpace, String> {
 	}
 }
 
-pub fn compile(reader: &mut ReadChar)->Result<GlobalNameSpace, String> {
+pub fn compile(reader: &mut Iterator<Item=char>)->Result<GlobalNameSpace, String> {
 	let tokens = try!(Token::parse(reader));
 	let stream = &mut TokenStream::new(tokens);
 	let mut ret = GlobalNameSpace::new();

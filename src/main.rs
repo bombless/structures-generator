@@ -27,8 +27,8 @@ fn main() {
 				for block in code_blocks.iter() {
 					match web::decode(&**block) {
 						Ok(code) =>{
-							let mut code = pre::remove_single_line_comments(&*code);
-							match prs::compile(&mut code) {
+							let code = &*pre::remove_single_line_comments(&*code);
+							match prs::compile(&mut code.chars()) {
 								Ok(x) =>println!("{:?}", x),
 								Err(e) =>println!("error: {}", e)
 							}
