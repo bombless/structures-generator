@@ -12,10 +12,10 @@ mod prs;
 mod pre;
 mod tok;
 
-
 #[cfg(not(test))]
 fn main() {
-	let config = cfg::load_config().unwrap();
+	use std::old_io::stdin;
+	let config = cfg::load_config(&mut stdin()).unwrap();
 	for page in web::fetch_contents(&config).unwrap().iter() {
 		println!("[{}]", page.url);
 		let code_blocks = web::find_code_blocks(&*page.content);
