@@ -5,7 +5,6 @@ extern crate regex;
 
 #[macro_use]
 mod macros;
-#[cfg(not(test))]
 mod cfg;
 mod web;
 mod prs;
