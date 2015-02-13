@@ -86,7 +86,7 @@ impl Display for Struct {
 			acc
 		});
 		slice.sort();
-		write!(f, "{}", slice.drain().fold(String::new(), |acc, (_, s)| {
+		write!(f, "{}", slice.into_iter().fold(String::new(), |acc, (_, s)| {
 			acc + &*s
 		}))
 	}
@@ -164,7 +164,7 @@ impl Display for Union {
 			acc
 		});
 		slice.sort();
-		write!(f, "{}", slice.drain().fold(String::new(), |acc, (_, s)| {
+		write!(f, "{}", slice.into_iter().fold(String::new(), |acc, (_, s)| {
 			acc + &*s
 		}))
 	}

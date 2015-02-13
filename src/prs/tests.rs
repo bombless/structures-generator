@@ -70,5 +70,5 @@ fn test_parser_output() {
 						"00 - 02", "00 - 04"),
 			compile(&mut "typedef struct { union { DWORD val; WORD word; }; } s;".chars()).unwrap()
 		)
-	].drain().fold((), |_, (lhs, rhs)| assert_eq!(lhs, format!("{:?}", rhs)))
+	].into_iter().fold((), |_, (lhs, rhs)| assert_eq!(lhs, format!("{:?}", rhs)))
 }
