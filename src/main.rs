@@ -1,10 +1,11 @@
-#![feature(core, hash, collections, io, rustc_private, path)]
+#![feature(core, hash, collections, io, path)]
 extern crate hyper;
-extern crate serialize;
+extern crate toml;
 extern crate regex;
 
 #[macro_use]
 mod macros;
+mod utils;
 mod cfg;
 mod web;
 mod prs;
