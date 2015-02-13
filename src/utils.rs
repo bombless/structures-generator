@@ -30,6 +30,6 @@ mod tests {
 			x.push_str(", world.");
 			Some(x)
 		});
-		assert_eq!("hello, world.".to_string(), x.get().unwrap())
+		assert_eq!("hello, world.", &*x.get().unwrap())
 	}
 }

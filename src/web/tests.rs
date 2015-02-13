@@ -18,7 +18,7 @@ fn find_code_blocks() {
 }
 #[test]
 fn test_cache() {
-	use web::{
+	use super::{
 		load_from_cache,
 		cache_path
 	};

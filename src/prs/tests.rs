@@ -1,6 +1,6 @@
 #[test]
 fn test_simple_case_for_parser() {
-	use prs::{
+	use super::{
 		TypeName,
 		Type,
 		compile,
@@ -63,12 +63,11 @@ fn test_simple_case_for_parser() {
 
 #[test]
 fn test_parser_output() {
-	use prs::compile;
 	vec![
 		(
 			format!("typedef struct {{\n\t{:32} word;\n\t{:32} val;\n}} s;\n",
 						"00 - 02", "00 - 04"),
-			compile(&mut "typedef struct { union { DWORD val; WORD word; }; } s;".chars()).unwrap()
+			super::compile(&mut "typedef struct { union { DWORD val; WORD word; }; } s;".chars()).unwrap()
 		)
 	].into_iter().fold((), |_, (lhs, rhs)| assert_eq!(lhs, format!("{:?}", rhs)))
 }
