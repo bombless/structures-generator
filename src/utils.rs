@@ -18,15 +18,15 @@ impl<T> Try<T> {
 	}
 }
 
-pub fn try<T>(v: Option<T>)->Try<T> {
-	Try(v)
+pub fn try<T>(v: T)->Try<T> {
+	Try(Some(v))
 }
 
 #[cfg(test)]
 mod tests {
 	#[test]
 	fn test() {
-		let x = super::try(Some("hello".to_string())).try(|mut x| {
+		let x = super::try("hello".to_string()).try(|mut x| {
 			x.push_str(", world.");
 			Some(x)
 		});

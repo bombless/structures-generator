@@ -10,7 +10,7 @@ use toml::Value::{
 mod tests;
 
 pub fn load_config(file: &mut Reader)->Result<Vec<String>, String> {
-	let cnt = try(file.read_to_string().ok());
+	let cnt = try(try_or_str!(file.read_to_string()));
 	let tbl = cnt.try(|x| Parser::new(&*x).parse());
 	tbl.try_or_err(|x| match x.get("urls") {
 		Some(&Array(ref arr)) =>{
