@@ -87,7 +87,7 @@ impl Display for Struct {
 		});
 		slice.sort();
 		write!(f, "{}", slice.into_iter().fold(String::new(), |acc, (_, s)| {
-			acc + &*s
+			acc + &s
 		}))
 	}
 }
@@ -165,7 +165,7 @@ impl Display for Union {
 		});
 		slice.sort();
 		write!(f, "{}", slice.into_iter().fold(String::new(), |acc, (_, s)| {
-			acc + &*s
+			acc + &s
 		}))
 	}
 }
@@ -208,7 +208,7 @@ impl Debug for Type {
 			&Type::Struct(ref s) =>format!("{:?}", s),
 			&Type::Union(ref u) =>format!("{:?}", u),
 			&Type::Primitive(size) =>format!("primitive[size: {}]", size),
-			&Type::Pointer(ref rc) =>format!("{:?}*", &*rc),
+			&Type::Pointer(ref rc) =>format!("{:?}*", &rc),
 			&Type::Unknown(ref name) =>format!("{}", name)
 		})
 	}

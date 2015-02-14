@@ -1,12 +1,7 @@
-use std::old_path::Path;
-use std::old_io::{
-	USER_DIR,
-	IoErrorKind
-};
-use std::old_io::fs::{
-	File,
-	mkdir
-};
+use std::fs::{create_dir, File};
+use std::io::{ErrorKind, Read};
+#[cfg(not(test))]
+use std::io::Write;
 #[cfg(not(test))]
 use hyper::Url;
 #[cfg(not(test))]
@@ -29,23 +24,24 @@ impl Page {
 	}
 }
 
-fn cache_path(name: &str)->Path {
-	let dir = Path::new(".cache");
-	if let Err(err) = mkdir(&dir, USER_DIR) {
-		if err.kind != IoErrorKind::PathAlreadyExists {
+fn cache_path(name: &str)->String {
+	if let Err(err) = create_dir(".cache") {
+		if err.kind() != ErrorKind::PathAlreadyExists {
 			panic!(err)
 		}
 	}
-	Path::new(name.chars().fold(format!(".cache/"), |mut acc, c| {
-		acc.push_str(&*format!("{}", c as u64));
+	name.chars().fold(format!(".cache/"), |mut acc, c| {
+		acc.push_str(&format!("{}", c as u64));
 		acc
-	}))
+	})
 }
 
 fn load_from_cache(url: &str)->Option<String> {
 	let path = cache_path(url);
 	let mut file = try_or_none!(File::open(&path));
-	Some(try_or_none!(file.read_to_string()))
+	let mut ret = String::new();
+	try_or_none!(file.read_to_string(&mut ret));
+	Some(ret)
 }
 
 #[cfg(not(test))]
@@ -54,7 +50,7 @@ fn load_url(name: &str)->Result<String, String> {
 	let mut res = try_or_str!(Client::new().get(url).send());
 	let body = try_or_str!(res.read_to_string());
 	let file_path = cache_path(name);
-	File::create(&file_path).write_str(&*body).unwrap();
+	try_or_str!(File::create(&file_path)).write_all(&body.clone().into_bytes()).unwrap();
 	Ok(body)
 }
 
@@ -62,11 +58,10 @@ fn load_url(name: &str)->Result<String, String> {
 pub fn fetch_contents(urls: &Vec<String>)->Result<Vec<Page>, String> {
 	let mut fail = None;
 	let ret = urls.iter().fold(Vec::new(), |mut acc, url| {
-		let url = &**url;
 		match load_from_cache(url) {
-			Some(x) =>acc.push(Page::new(url, &*x)),
+			Some(x) =>acc.push(Page::new(url, &x)),
 			None =>match load_url(url) {
-				Ok(x) =>acc.push(Page::new(url, &*x)),
+				Ok(x) =>acc.push(Page::new(url, &x)),
 				Err(x) =>fail = Some(format!("{:?}", x))
 			}
 		}

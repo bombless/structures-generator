@@ -2,13 +2,13 @@
 fn test_decode() {
 	use web::decode;
 	let rslt = decode("<a>hi</a>").unwrap();
-	assert_eq!(&*rslt, "hi")
+	assert_eq!(rslt, "hi")
 }
 #[test]
 fn test_path() {
 	use web::cache_path;
 	let path = cache_path(" ");
-	assert_eq!(Path::new(".cache/32"), path)
+	assert_eq!(path, ".cache/32")
 }
 #[test]
 fn find_code_blocks() {
@@ -22,9 +22,10 @@ fn test_cache() {
 		load_from_cache,
 		cache_path
 	};
-	use std::old_io::fs::File;
+	use std::fs::File;
+	use std::io::Write;
 	let path = cache_path("test");
-	File::create(&path).write_str("test").unwrap();
+	File::create(&path).unwrap().write_all(b"test").unwrap();
 	let rslt = load_from_cache("test").unwrap();
-	assert_eq!(&*rslt, "test")
+	assert_eq!(rslt, "test")
 }
